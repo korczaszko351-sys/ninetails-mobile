@@ -1,0 +1,251 @@
+name: Ninetails Mobile — build
+
+# Co ten workflow REALNIE buduje na runnerze GitHub-hosted (ubuntu-24.04):
+#
+#   job: scripts      — walidacja składni wszystkich skryptów build/*.sh
+#   job: ril-bridge   — KOMPILACJA mostu RIL hosta (g++ + protoc + libdbus)
+#   job: aeroradar    — KOMPILACJA APK AeroRadar (Gradle + Android SDK)
+#   job: full-image   — NIE buduje obrazu; raportuje, czego wymaga pełne środowisko
+#
+# Obraz systemu (Chromium OS host + ARCVM) NIE powstaje tutaj: wymaga ~200 GB
+# źródeł, 32 GB+ RAM i kilku godzin. Ten workflow buduje to, co da się zbudować
+# na publicznym runnerze, i jawnie wypisuje, co pozostaje.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  scripts:
+    name: Walidacja skryptów budowania
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n na każdym skrypcie
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in build/*.sh build/lib/*.sh; do
+            printf '%-28s ' "$f"
+            if bash -n "$f"; then echo OK; else echo FAIL; fail=1; fi
+          done
+          echo "---"
+          echo "Pliki sprawdzone: $(ls build/*.sh build/lib/*.sh | wc -l)"
+          exit $fail
+
+      - name: shellcheck (ostrzeżenia, nie blokuje)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck -S warning build/*.sh build/lib/*.sh || true
+
+      - name: Walidacja XML (manifest, layouty, polityki)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq libxml2-utils
+          n=0
+          while IFS= read -r f; do
+            xmllint --noout "$f" && n=$((n+1))
+          done < <(find . -name '*.xml' -not -path './.git/*')
+          echo "Poprawne pliki XML: $n"
+
+      - name: Spójność konfiguracji urządzenia
+        run: |
+          set -euo pipefail
+          test -f device/aerophone/BoardConfig.mk
+          test -f device/aerophone/device.mk
+          test -f device/aerophone/manifest.xml
+          grep -q 'TARGET_BOARD_PLATFORM' device/aerophone/BoardConfig.mk
+          grep -q 'AeroRadar' device/aerophone/device.mk
+          echo "Konfiguracja płytki aerophone: OK"
+
+  # ---------------------------------------------------------------------------
+  ril-bridge:
+    name: Kompilacja mostu RIL (host)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zależności
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential protobuf-compiler libprotobuf-dev libdbus-1-dev
+
+      - name: Wersje narzędzi
+        run: |
+          g++ --version | head -1
+          protoc --version
+
+      - name: Generowanie kodu z rilbridge.proto
+        run: |
+          set -euo pipefail
+          mkdir -p out/proto
+          protoc --proto_path=telephony/proto \
+                 --cpp_out=out/proto \
+                 telephony/proto/rilbridge.proto
+          ls -l out/proto
+
+      - name: Kompilacja rilbridged + backendy + D-Bus
+        run: |
+          set -euo pipefail
+          mkdir -p out/obj
+          # tools/ci/android-base/logging.h to shim: w drzewie AOSP/Chromium OS
+          # ten nagłówek pochodzi z libbase. Tutaj podstawiamy zgodny interfejs.
+          CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+                    -Iout/proto -Itelephony/host -Itools/ci"
+          for src in telephony/host/rilbridged.cc \
+                     telephony/host/qmi_backend.cc \
+                     telephony/host/mbim_backend.cc \
+                     telephony/host/dbus_service.cc; do
+            obj="out/obj/$(basename "${src%.cc}").o"
+            echo "== $src"
+            g++ $CXXFLAGS -c "$src" -o "$obj"
+          done
+          echo "---"
+          ls -l out/obj
+
+      - name: Linkowanie
+        run: |
+          set -euo pipefail
+          g++ -o out/rilbridged out/obj/rilbridged.o \
+              out/obj/qmi_backend.o out/obj/mbim_backend.o \
+              out/proto/rilbridge.pb.cc \
+              -lprotobuf -lpthread
+          g++ -o out/aerophone-telephony-dbus out/obj/dbus_service.o -ldbus-1
+          file out/rilbridged out/aerophone-telephony-dbus
+          ls -lh out/rilbridged out/aerophone-telephony-dbus
+
+      - name: Test dymny binarki
+        run: |
+          set -euo pipefail
+          ./out/rilbridged --help
+          echo "---"
+          echo "Binarka istnieje i startuje (brak modemu/vsock w runnerze = oczekiwane)."
+
+      - name: Artefakt — binarki mostu RIL
+        uses: actions/upload-artifact@v4
+        with:
+          name: rilbridged-linux-x86_64
+          path: |
+            out/rilbridged
+            out/aerophone-telephony-dbus
+          if-no-files-found: error
+
+      - name: Artefakt — log kompilacji
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ril-bridge-build-log
+          path: |
+            out/obj
+            out/proto
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  aeroradar:
+    name: Kompilacja APK AeroRadar
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalacja platformy i build-tools
+        run: |
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" | tail -5
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        working-directory: apps/AeroRadar
+        run: |
+          set -euo pipefail
+          gradle --no-daemon assembleDebug --stacktrace 2>&1 | tee build.log
+          echo "---"
+          find . -name '*.apk' -exec ls -lh {} \;
+
+      - name: Artefakt — APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeroradar-debug-apk
+          path: apps/AeroRadar/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Artefakt — log Gradle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeroradar-build-log
+          path: apps/AeroRadar/build.log
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  full-image:
+    name: Obraz systemu — wymagania pełnego środowiska
+    runs-on: ubuntu-24.04
+    needs: [scripts, ril-bridge]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Raport zakresu
+        run: |
+          cat <<'EOF'
+          ============================================================
+           OBRAZ SYSTEMU NINETAILS MOBILE — NIE ZBUDOWANY W CI
+          ============================================================
+
+          Ten workflow buduje komponenty, które da się zbudować na
+          publicznym runnerze. Obraz urządzenia (host Chromium OS +
+          ARCVM) wymaga środowiska, którego runner nie zapewnia:
+
+            - źródła Chromium OS (repo sync)      ~120 GB
+            - źródła AOSP / ARCVM                 ~80 GB
+            - RAM                                 32 GB min. (64 GB zalecane)
+            - czas                                4-8 h (pierwszy build)
+            - uprawnienia                          sudo, loop devices, chroot
+
+          Aby zbudować obraz lokalnie:
+
+            make bootstrap     # repo sync (długo)
+            make host          # obraz hosta
+            make arcvm         # obraz ARCVM z AeroRadar
+            make image         # złożenie obrazu + partycje A/B
+            make flash         # wgranie na urządzenie
+
+          Szczegóły: docs/BUILD.md, docs/FLASH.md
+          ============================================================
+          EOF
+
+      - name: Podsumowanie w GitHub Step Summary
+        run: |
+          {
+            echo "## Ninetails Mobile — wynik budowania"
+            echo ""
+            echo "| Komponent | Status |"
+            echo "|---|---|"
+            echo "| Skrypty budowania | ✅ zwalidowane |"
+            echo "| Most RIL (host) | ✅ skompilowany |"
+            echo "| AeroRadar APK | zobacz job \`aeroradar\` |"
+            echo "| Obraz systemu | ⚠️ wymaga pełnego środowiska |"
+            echo ""
+            echo "Obraz urządzenia nie powstaje w CI — patrz \`docs/BUILD.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
