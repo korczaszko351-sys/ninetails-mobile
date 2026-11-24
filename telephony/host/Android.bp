@@ -1,0 +1,58 @@
+# Android.bp — moduły telefonii hosta (Soong)
+#
+# Budowane w drzewie Chromium OS (portage) lub AOSP (dla testów).
+# W Chromium OS: chromeos-base/aerophone-telephony → emerge
+#
+# Ścieżki w srcs są względne wobec katalogu tego pliku (telephony/host/).
+
+cc_defaults {
+    name: "rilbridged_defaults",
+    cpp_std: "c++20",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-DAEROPHONE_TELEPHONY=1",
+    ],
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libprotobuf-cpp-lite",
+    ],
+    static_libs: [
+        "rilbridge_proto",
+    ],
+}
+
+# Protokół mostu RIL (protobuf lite)
+cc_library {
+    name: "rilbridge_proto",
+    proto: {
+        export_proto_headers: true,
+        type: "lite",
+    },
+    srcs: ["../proto/rilbridge.proto"],
+    cpp_std: "c++20",
+}
+
+# Demon hosta
+cc_binary {
+    name: "rilbridged",
+    defaults: ["rilbridged_defaults"],
+    srcs: [
+        "rilbridged.cc",
+        "qmi_backend.cc",
+        "mbim_backend.cc",
+    ],
+    init_rc: ["rilbridged.rc"],
+    vendor: true,
+}
+
+# Usługa D-Bus (host) — interfejs dla powłoki i ustawień
+cc_binary {
+    name: "aerophone-telephony-dbus",
+    defaults: ["rilbridged_defaults"],
+    srcs: ["dbus_service.cc"],
+    shared_libs: ["libdbus"],
+    vendor: true,
+}

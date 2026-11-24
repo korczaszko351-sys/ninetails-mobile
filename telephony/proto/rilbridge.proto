@@ -1,0 +1,264 @@
+syntax = "proto3";
+
+// rilbridge.proto — protokół mostu RIL między hostem (Chromium OS) a gościem (ARCVM).
+//
+// Model: modem jest fizycznie na hoście (L0/L2). Framework telekomunikacyjny
+// Androida działa w gościu (L6). Most przenosi żądania RIL przez virtio-vsock.
+//
+//   [Android Telephony] → [HAL radiowy] → [vsock] → [rilbridged] → [QMI/MBIM] → [modem]
+//
+// Dlaczego nie przekazać modemu do VM przez PCI passthrough?
+//   - passthrough wymaga IOMMU i wyklucza hosta z zarządzania energią modemu
+//   - host musi widzieć stan modemu (połączenia alarmowe, IMS) niezależnie od VM
+//   - modem dzielony między hostem a gościem (np. dane dla update_engine)
+//
+// Dlaczego protobuf na vsock, a nie Binder?
+//   - Binder nie przechodzi granicy VM bez dodatkowej warstwy (binderfs + proxy)
+//   - protobuf daje wersjonowanie schematu i stabilny kontrakt
+//   - vsock jest natywny dla crosvm (bez konfiguracji sieci w gościu)
+
+package aerophone.rilbridge;
+
+option java_package = "com.aerophone.rilbridge";
+option java_outer_classname = "RilBridgeProto";
+option optimize_for = LITE_RUNTIME;
+
+// ===========================================================================
+// Koperta — każda wiadomość ma ID korelacji i wersję protokołu
+// ===========================================================================
+message Envelope {
+  uint32 protocol_version = 1;   // obecnie 1
+  uint64 request_id = 2;         // korelacja żądanie/odpowiedź
+  uint32 client_id = 3;          // który klient (gość) — max BOARD_RILBRIDGE_MAX_CLIENTS
+  int64 timestamp_ms = 4;
+
+  oneof payload {
+    // Gość → host
+    DialRequest          dial            = 10;
+    AnswerRequest        answer          = 11;
+    HangupRequest        hangup          = 12;
+    SendSmsRequest       send_sms        = 13;
+    SendUssdRequest      send_ussd       = 14;
+    SetRadioStateRequest set_radio_state = 15;
+    DataCallRequest      data_call       = 16;
+    SimRequest           sim             = 17;
+    SignalQuery          signal_query    = 18;
+    NetworkScanRequest   network_scan    = 19;
+
+    // Host → gość
+    IncomingCallEvent    incoming_call   = 30;
+    CallStateEvent       call_state      = 31;
+    SmsReceivedEvent     sms_received    = 32;
+    UssdResponseEvent    ussd_response   = 33;
+    SignalUpdateEvent    signal_update   = 34;
+    DataCallStateEvent   data_call_state = 35;
+    SimStateEvent        sim_state       = 36;
+    ModemResetEvent      modem_reset     = 37;
+
+    // Wspólne
+    Response             response        = 50;
+    Error                error           = 51;
+    Heartbeat            heartbeat       = 52;
+  }
+}
+
+// ===========================================================================
+// Żądania: połączenia
+// ===========================================================================
+message DialRequest {
+  string address = 1;            // numer docelowy (E.164)
+  bool   emergency = 2;          // połączenie alarmowe — priorytet absolutny
+  int32  slot_id = 3;            // SIM slot (0 = domyślny)
+  bool   video = 4;              // VT
+  string clir = 5;               // "default" | "invoke" | "suppress"
+}
+
+message AnswerRequest {
+  int32 call_id = 1;
+  int32 video_state = 2;         // 0=audio, 1=tx, 2=rx, 3=bi
+}
+
+message HangupRequest {
+  int32 call_id = 1;
+  int32 reason = 2;              // mapowanie na RIL hangup reason
+}
+
+// ===========================================================================
+// Żądania: SMS / USSD
+// ===========================================================================
+message SendSmsRequest {
+  string address = 1;
+  bytes  pdu = 2;                // zakodowany PDU (GSM 03.40)
+  string smsc = 3;
+  bool   expect_ack = 4;
+  int32  slot_id = 5;
+}
+
+message SendUssdRequest {
+  string ussd = 1;               // np. "*100#"
+  int32  slot_id = 2;
+}
+
+// ===========================================================================
+// Żądania: stan radia i dane
+// ===========================================================================
+message SetRadioStateRequest {
+  enum State { OFF = 0; ON = 1; }   // UNAVAILABLE mapujemy na OFF
+  State state = 1;
+  bool  force = 2;
+}
+
+message DataCallRequest {
+  enum Action { SETUP = 0; DEACTIVATE = 1; }
+  Action action = 1;
+  string apn = 2;
+  string apn_type = 3;           // "default" | "mms" | "ims" | "supl"
+  string protocol = 4;           // "IP" | "IPV6" | "IPV4V6"
+  int32  profile_id = 5;
+  int32  slot_id = 6;
+}
+
+// ===========================================================================
+// Żądania: SIM
+// ===========================================================================
+message SimRequest {
+  enum Op {
+    GET_ICCID = 0;
+    GET_IMSI = 1;
+    GET_STATE = 2;
+    ENTER_PIN = 3;
+    CHANGE_PIN = 4;
+    GET_OPERATOR = 5;
+    // eSIM (LPA)
+    ESIM_GET_PROFILES = 10;
+    ESIM_ENABLE_PROFILE = 11;
+    ESIM_DOWNLOAD_PROFILE = 12;
+    ESIM_DELETE_PROFILE = 13;
+  }
+  Op     op = 1;
+  int32  slot_id = 2;
+  string pin = 3;
+  string new_pin = 4;
+  string activation_code = 5;    // eSIM: LPA activation code
+  string iccid = 6;
+}
+
+// ===========================================================================
+// Żądania: sygnał i skanowanie sieci
+// ===========================================================================
+message SignalQuery {
+  int32 slot_id = 1;
+}
+
+message NetworkScanRequest {
+  int32 slot_id = 1;
+  bool  include_neighbors = 2;
+}
+
+// ===========================================================================
+// Zdarzenia: host → gość
+// ===========================================================================
+message IncomingCallEvent {
+  int32  call_id = 1;
+  string address = 2;
+  string display_name = 3;
+  bool   emergency = 4;
+  int32  slot_id = 5;
+  string presentation = 6;       // "allowed" | "restricted" | "unknown"
+}
+
+message CallStateEvent {
+  enum State {
+    ACTIVE = 0; HOLDING = 1; DIALING = 2; ALERTING = 3;
+    INCOMING = 4; WAITING = 5; DISCONNECTED = 6;
+  }
+  int32 call_id = 1;
+  State state = 2;
+  int32 cause = 3;               // kod rozłączenia (3GPP 24.008)
+  bool  is_emergency = 4;
+}
+
+message SmsReceivedEvent {
+  string address = 1;
+  bytes  pdu = 2;
+  string smsc = 3;
+  int64  timestamp_ms = 4;
+  int32  slot_id = 5;
+}
+
+message UssdResponseEvent {
+  string response = 1;
+  int32  status = 2;             // 0=ok, 1=terminated, 2=unsupported
+}
+
+message SignalUpdateEvent {
+  int32  rssi_dbm = 1;
+  int32  rsrp_dbm = 2;
+  int32  rsrq_db = 3;
+  int32  sinr_db = 4;
+  int32  level = 5;              // 0..4 (paski)
+  string network_type = 6;       // "LTE" | "NR" | "UMTS" | "GSM"
+  string operator_name = 7;
+  string mcc_mnc = 8;
+  bool   roaming = 9;
+}
+
+message DataCallStateEvent {
+  enum State { DISCONNECTED = 0; CONNECTING = 1; CONNECTED = 2; SUSPENDED = 3; }
+  State  state = 1;
+  string apn_type = 2;
+  string iface = 3;              // nazwa interfejsu w gościu
+  string ip_address = 4;
+  int32  mtu = 5;
+  int32  cause = 6;
+}
+
+message SimStateEvent {
+  enum State { ABSENT = 0; PIN_REQUIRED = 1; PUK_REQUIRED = 2; READY = 3; ERROR = 4; }
+  State  state = 1;
+  int32  slot_id = 2;
+  int32  pin_retries = 3;
+  int32  puk_retries = 4;
+  string iccid = 5;
+}
+
+message ModemResetEvent {
+  enum Reason { CRASH = 0; WATCHDOG = 1; USER_REQUEST = 2; OTA = 3; }
+  Reason reason = 1;
+  int32  recovery_ms = 2;
+}
+
+// ===========================================================================
+// Odpowiedzi i błędy
+// ===========================================================================
+message Response {
+  uint64 request_id = 1;
+  bool   success = 2;
+  bytes  data = 3;               // zakodowana odpowiedź szczegółowa
+}
+
+message Error {
+  uint64 request_id = 1;
+  enum Code {
+    OK = 0;
+    RADIO_NOT_AVAILABLE = 1;
+    MODEM_BUSY = 2;
+    SIM_ERROR = 3;
+    NETWORK_REJECTED = 4;
+    INVALID_ARGUMENT = 5;
+    TIMEOUT = 6;
+    NOT_SUPPORTED = 7;
+    INTERNAL = 8;
+    EMERGENCY_ONLY = 9;
+  }
+  Code   code = 2;
+  string message = 3;
+  bool   retryable = 4;
+}
+
+message Heartbeat {
+  int64  uptime_ms = 1;
+  int32  active_calls = 2;
+  string modem_state = 3;
+  int32  queue_depth = 4;
+}

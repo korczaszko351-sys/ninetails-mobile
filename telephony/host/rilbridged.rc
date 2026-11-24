@@ -1,0 +1,22 @@
+# rilbridged.rc — init script dla Androida (gdy rilbridged budowany w AOSP)
+#
+# W Chromium OS używamy systemd (rilbridged.service). Ten plik jest dla
+# przypadku, gdy rilbridged jest budowany w drzewie AOSP (testy, devkit).
+
+service rilbridged /vendor/bin/rilbridged --port 5000 --modem /dev/qmi0 --backend qmi
+    class core
+    user root
+    group modem
+    # Dostęp do modemu i vsock
+    seclabel u:r:rilbridged:s0
+    # Restart przy awarii
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start rilbridged
+
+# Gdy modem się zresetuje — restart mostu
+on property:vendor.aerophone.modem.reset=1
+    restart rilbridged
+    setprop vendor.aerophone.modem.reset 0
