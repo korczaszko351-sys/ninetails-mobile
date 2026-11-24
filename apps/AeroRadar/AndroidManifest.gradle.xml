@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.gradle.xml — manifest dla builda Gradle (CI / deweloperski).
+
+  To kopia AndroidManifest.xml używana wyłącznie przez build.gradle.kts.
+  Różnica: brak atrybutu `package` (w Gradle namespace pochodzi z build.gradle.kts)
+  oraz brak <uses-sdk> (compileSdk/minSdk ustawia Gradle).
+
+  Manifest produkcyjny (dla Soong, w obrazie ARCVM) to AndroidManifest.xml.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    android:versionCode="1"
+    android:versionName="1.0.0">
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="com.aerophone.permission.TELEPHONY_BRIDGE" />
+
+    <application
+        android:name=".AeroRadarApp"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.AeroRadar"
+        android:allowBackup="false"
+        android:directBootAware="true"
+        android:hardwareAccelerated="true"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".ui.RadarActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.AeroRadar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.AircraftDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.RadarActivity" />
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title" />
+
+        <service
+            android:name=".service.RadarService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name=".data.AircraftProvider"
+            android:authorities="com.aerophone.aeroradar.provider"
+            android:exported="true"
+            android:readPermission="com.aerophone.permission.READ_AIRCRAFT" />
+
+        <activity
+            android:name=".ui.OverheadActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AeroRadar.Transparent">
+            <intent-filter>
+                <action android:name="com.aerophone.aeroradar.OVERHEAD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+    <permission
+        android:name="com.aerophone.permission.READ_AIRCRAFT"
+        android:protectionLevel="signature" />
+    <permission
+        android:name="com.aerophone.permission.TELEPHONY_BRIDGE"
+        android:protectionLevel="signature|privileged" />
+
+</manifest>
