@@ -1,0 +1,45 @@
+# Ninetails Mobile — pliki ignorowane przez git
+
+# Artefakty budowania
+/out/
+/src/
+/.cache/
+/dist/
+
+# Klucze — NIGDY nie commituj
+/keys/
+*.pem
+*.pk8
+*.key
+*.jks
+*.keystore
+
+# Obrazy i binarki
+*.img
+*.bin
+*.sig
+*.zip
+*.apk
+*.aab
+*.o
+*.pb.cc
+*.pb.h
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+
+# Logi
+*.log
+build.log
+
+# Edytory
+.vscode/
+.idea/
+*.swp
+*~
+
+# System
+.DS_Store
+Thumbs.db
