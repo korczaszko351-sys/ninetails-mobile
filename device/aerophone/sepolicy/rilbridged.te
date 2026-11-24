@@ -1,0 +1,45 @@
+# rilbridged.te — polityka SELinux dla mostu RIL (host)
+#
+# rilbridged potrzebuje:
+#   - dostępu do urządzenia modemu (/dev/qmi0)
+#   - gniazda vsock (nasłuch dla ARCVM)
+#   - zapisu logów do journald
+#
+# Zasada minimalnych uprawnień: tylko to, co konieczne.
+
+policy_module(rilbridged, 1.0.0)
+
+type rilbridged_t;
+type rilbridged_exec_t;
+init_daemon_domain(rilbridged_t, rilbridged_exec_t)
+
+# --- Urządzenie modemu ------------------------------------------------------
+dev_node(qmi_device_t)
+type qmi_device_t;
+dev_node(qmi_device_t)
+
+allow rilbridged_t qmi_device_t:chr_file { open read write ioctl lock };
+allow rilbridged_t qmi_device_t:chr_file map;
+
+# --- vsock ------------------------------------------------------------------
+# Nasłuch na porcie 5000 dla ARCVM
+allow rilbridged_t self:vsock_socket { create bind listen accept read write };
+allow rilbridged_t node_t:vsock_socket { node_bind };
+
+# --- Komunikacja z systemem -------------------------------------------------
+# Logi
+allow rilbridged_t devlog_t:lnk_file read;
+allow rilbridged_t devlog_t:sock_file write;
+allow rilbridged_t kernel_t:system syslog_read;
+
+# D-Bus (usługa telefonii)
+dbus_system_bus_client(rilbridged_t)
+allow rilbridged_t aerophone_telephony_t:dbus send_msg;
+
+# --- Pliki konfiguracyjne ---------------------------------------------------
+allow rilbridged_t rilbridged_conf_t:file read_file_perms;
+files_type(rilbridged_conf_t)
+
+# --- Zakazy (jawnie) --------------------------------------------------------
+# rilbridged NIE potrzebuje: dostępu do sieci, do kamer, do danych użytkownika
+dontaudit rilbridged_t self:capability { net_admin net_raw };

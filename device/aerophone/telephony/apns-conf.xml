@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  apns-conf.xml — punkty dostępu (APN) dla polskich operatorów.
+  Podzbiór — pełna lista pochodzi od operatorów / AOSP.
+
+  Uwaga: APN dla IMS (VoLTE) i MMS są osobne od domyślnego.
+-->
+<apns version="8">
+    <!-- Orange Polska -->
+    <apn carrier="Orange Internet"
+         mcc="260" mnc="03"
+         apn="internet" type="default,supl"
+         protocol="IPV4V6" roaming_protocol="IPV4V6" />
+    <apn carrier="Orange MMS"
+         mcc="260" mnc="03"
+         apn="mms" type="mms"
+         mmsc="http://mms.orange.pl" proxy="192.168.6.104" port="8080"
+         protocol="IPV4V6" />
+    <apn carrier="Orange IMS"
+         mcc="260" mnc="03"
+         apn="ims" type="ims"
+         protocol="IPV4V6" />
+
+    <!-- Play (P4) -->
+    <apn carrier="Play Internet"
+         mcc="260" mnc="06"
+         apn="internet" type="default,supl"
+         protocol="IPV4V6" roaming_protocol="IPV4V6" />
+    <apn carrier="Play MMS"
+         mcc="260" mnc="06"
+         apn="mms" type="mms"
+         mmsc="http://mmsc.play.pl" proxy="10.10.25.5" port="8080"
+         protocol="IPV4V6" />
+    <apn carrier="Play IMS"
+         mcc="260" mnc="06"
+         apn="ims" type="ims"
+         protocol="IPV4V6" />
+
+    <!-- T-Mobile Polska -->
+    <apn carrier="T-Mobile Internet"
+         mcc="260" mnc="02"
+         apn="internet" type="default,supl"
+         protocol="IPV4V6" roaming_protocol="IPV4V6" />
+    <apn carrier="T-Mobile MMS"
+         mcc="260" mnc="02"
+         apn="mms" type="mms"
+         mmsc="http://mms.t-mobile.pl" proxy="213.158.194.226" port="8080"
+         protocol="IPV4V6" />
+    <apn carrier="T-Mobile IMS"
+         mcc="260" mnc="02"
+         apn="ims" type="ims"
+         protocol="IPV4V6" />
+
+    <!-- Plus (Polkomtel) -->
+    <apn carrier="Plus Internet"
+         mcc="260" mnc="01"
+         apn="internet" type="default,supl"
+         protocol="IPV4V6" roaming_protocol="IPV4V6" />
+    <apn carrier="Plus MMS"
+         mcc="260" mnc="01"
+         apn="mms" type="mms"
+         mmsc="http://mms.plusgsm.pl" proxy="212.2.96.16" port="8080"
+         protocol="IPV4V6" />
+    <apn carrier="Plus IMS"
+         mcc="260" mnc="01"
+         apn="ims" type="ims"
+         protocol="IPV4V6" />
+</apns>

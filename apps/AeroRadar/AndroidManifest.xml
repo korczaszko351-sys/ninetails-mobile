@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.xml — AeroRadar (aplikacja systemowa AeroPhone OS)
+
+  AeroRadar to radar ADS-B: pokazuje samoloty wokół użytkownika na mapie,
+  z identyfikacją (Aero ID) — callsign, rejestracja, typ, linia, trasa.
+
+  Jako priv-app ma uprawnienia systemowe, których zwykła aplikacja by nie dostała:
+    - lokalizacja w tle (radar działa przy zgaszonym ekranie)
+    - powiadomienia o samolotach (bez limitu rate)
+    - dostęp do sieci bez ograniczeń tła
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.aerophone.aeroradar"
+    android:versionCode="1"
+    android:versionName="1.0.0">
+
+    <!-- Wymagania sprzętowe / systemowe -->
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34" />
+
+    <!-- Lokalizacja: potrzebna do wyśrodkowania radaru -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Sieć: dane ADS-B z API -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Powiadomienia o samolotach -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Uprawnienia systemowe (priv-app) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- AeroPhone: dostęp do mostu telefonii (stan sieci dla pokrycia ADS-B) -->
+    <uses-permission android:name="com.aerophone.permission.TELEPHONY_BRIDGE" />
+
+    <application
+        android:name=".AeroRadarApp"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.AeroRadar"
+        android:allowBackup="false"
+        android:directBootAware="true"
+        android:hardwareAccelerated="true"
+        android:supportsRtl="true">
+
+        <!-- Ekran główny: radar -->
+        <activity
+            android:name=".ui.RadarActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.AeroRadar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Szczegóły samolotu (Aero ID) -->
+        <activity
+            android:name=".ui.AircraftDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.RadarActivity" />
+
+        <!-- Ustawienia -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title" />
+
+        <!-- Usługa w tle: śledzenie i powiadomienia -->
+        <service
+            android:name=".service.RadarService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Odbiór BOOT_COMPLETED: restart usługi po restarcie systemu -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Dostawca danych o samolotach (dla innych aplikacji systemowych) -->
+        <provider
+            android:name=".data.AircraftProvider"
+            android:authorities="com.aerophone.aeroradar.provider"
+            android:exported="true"
+            android:readPermission="com.aerophone.permission.READ_AIRCRAFT" />
+
+        <!-- Skrót: "Co nade mną?" — szybki podgląd -->
+        <activity
+            android:name=".ui.OverheadActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AeroRadar.Transparent">
+            <intent-filter>
+                <action android:name="com.aerophone.aeroradar.OVERHEAD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+    <!-- Deklaracja uprawnień własnych (dla innych aplikacji) -->
+    <permission
+        android:name="com.aerophone.permission.READ_AIRCRAFT"
+        android:protectionLevel="signature" />
+    <permission
+        android:name="com.aerophone.permission.TELEPHONY_BRIDGE"
+        android:protectionLevel="signature|privileged" />
+
+</manifest>

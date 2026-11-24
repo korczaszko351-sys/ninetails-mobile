@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  manifest.xml — repo manifest dla AeroPhone OS.
+
+  Dwa drzewa w jednym manifeście:
+    - Chromium OS (host)  → src/src/
+    - AOSP (ARCVM guest)  → src/arcvm/
+
+  Wersje są pinowane (revision), żeby build był powtarzalny.
+  Zmiana wersji = nowy build ID w build/env.sh.
+-->
+<manifest>
+  <remote name="chromium" fetch="https://chromium.googlesource.com" />
+  <remote name="aosp"     fetch="https://android.googlesource.com" />
+  <remote name="github"   fetch="https://github.com" />
+
+  <default revision="refs/heads/main" sync-j="4" />
+
+  <!-- ===================== HOST: Chromium OS ===================== -->
+  <project name="chromiumos/chromiumos"
+           path="src"
+           remote="chromium"
+           revision="refs/heads/release-R126-15886.B" />
+
+  <!-- Warstwa wirtualizacji (crosvm, concierge, cicerone) -->
+  <project name="chromiumos/platform/crosvm"
+           path="src/src/platform2/vm_tools/crosvm"
+           remote="chromium"
+           revision="refs/heads/release-R126-15886.B" />
+
+  <!-- update_engine (A/B OTA) -->
+  <project name="chromiumos/platform/update_engine"
+           path="src/src/platform2/update_engine"
+           remote="chromium"
+           revision="refs/heads/release-R126-15886.B" />
+
+  <!-- ARC++ / ARCVM (integracja Android w ChromeOS) -->
+  <project name="chromiumos/platform2"
+           path="src/src/platform2"
+           remote="chromium"
+           revision="refs/heads/release-R126-15886.B" />
+
+  <!-- ===================== GUEST: AOSP (ARCVM) ===================== -->
+  <project name="platform/manifest"
+           path="arcvm/.repo/manifests"
+           remote="aosp"
+           revision="refs/tags/android-14.0.0_r50" />
+
+  <project name="platform/frameworks/base"
+           path="arcvm/frameworks/base"
+           remote="aosp"
+           revision="refs/tags/android-14.0.0_r50" />
+
+  <project name="platform/system/core"
+           path="arcvm/system/core"
+           remote="aosp"
+           revision="refs/tags/android-14.0.0_r50" />
+
+  <project name="platform/hardware/interfaces"
+           path="arcvm/hardware/interfaces"
+           remote="aosp"
+           revision="refs/tags/android-14.0.0_r50" />
+
+  <project name="platform/packages/apps/Settings"
+           path="arcvm/packages/apps/Settings"
+           remote="aosp"
+           revision="refs/tags/android-14.0.0_r50" />
+
+  <!-- ===================== NASZE MODUŁY ===================== -->
+  <!--
+    Te projekty są w tym samym repozytorium (AeroPhone OS), więc repo
+    nie klonuje ich ponownie — build-arcvm.sh kopiuje je do drzewa AOSP.
+    Wpisane tu dla kompletności manifestu i przyszłego rozbicia na repo.
+  -->
+  <project name="aerophone-os/telephony"
+           path="telephony"
+           remote="github"
+           revision="main" />
+
+  <project name="aerophone-os/apps/AeroRadar"
+           path="apps/AeroRadar"
+           remote="github"
+           revision="main" />
+
+</manifest>

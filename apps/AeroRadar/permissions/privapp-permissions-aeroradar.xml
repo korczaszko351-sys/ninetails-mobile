@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  privapp-permissions-aeroradar.xml — uprawnienia systemowe dla AeroRadar.
+
+  Bez tego pliku system odmówi przyznania uprawnień oznaczonych jako
+  signature|privileged aplikacji z /system/priv-app (Android 9+).
+-->
+<permissions>
+    <privapp-permissions package="com.aerophone.aeroradar">
+        <!-- Lokalizacja w tle bez pytania użytkownika o każdą sesję -->
+        <permission name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+        <permission name="android.permission.ACCESS_FINE_LOCATION" />
+
+        <!-- Powiadomienia bez limitu (radar może generować wiele) -->
+        <permission name="android.permission.POST_NOTIFICATIONS" />
+
+        <!-- Usługa pierwszoplanowa typu location -->
+        <permission name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+        <!-- Restart po boocie -->
+        <permission name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+        <!-- Dostęp do stanu telefonii (pokrycie sieci dla ADS-B) -->
+        <permission name="android.permission.READ_PHONE_STATE" />
+
+        <!-- Wake lock: radar działa przy zgaszonym ekranie -->
+        <permission name="android.permission.WAKE_LOCK" />
+    </privapp-permissions>
+</permissions>

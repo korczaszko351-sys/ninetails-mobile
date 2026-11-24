@@ -1,0 +1,19 @@
+# file_contexts — etykiety SELinux dla plików AeroPhone OS
+
+# Demon telefonii hosta
+/system/bin/rilbridged              --  u:object_r:rilbridged_exec_t:s0
+/vendor/bin/rilbridged              --  u:object_r:rilbridged_exec_t:s0
+
+# Konfiguracja telefonii
+/vendor/etc/modem.conf              --  u:object_r:rilbridged_conf_t:s0
+/vendor/etc/apns-conf.xml           --  u:object_r:rilbridged_conf_t:s0
+
+# Urządzenie modemu
+/dev/qmi0                           -c  u:object_r:qmi_device_t:s0
+/dev/qmi1                           -c  u:object_r:qmi_device_t:s0
+
+# HAL radiowy w gościu (ARCVM)
+/vendor/bin/hw/android\.hardware\.radio-service\.aerophone  --  u:object_r:hal_radio_default_exec_t:s0
+
+# AeroRadar (priv-app)
+/system/priv-app/AeroRadar(/.*)?        u:object_r:system_file:s0

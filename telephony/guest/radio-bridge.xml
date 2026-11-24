@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  radio-bridge.xml — fragment VINTF dla HAL radiowego AeroPhone.
+
+  Deklaruje usługę android.hardware.radio.aerophone.IRadioBridge/default
+  w manifeście urządzenia, żeby framework mógł ją znaleźć.
+-->
+<manifest version="1.0" type="device">
+  <hal format="aidl">
+    <name>android.hardware.radio.aerophone</name>
+    <version>1</version>
+    <fqname>IRadioBridge/default</fqname>
+  </hal>
+</manifest>

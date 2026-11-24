@@ -1,0 +1,22 @@
+# radio-bridge.rc — init script dla HAL radiowego w ARCVM
+#
+# Uruchamiany przez init Androida w gościu. Czeka na dostępność vsock
+# (host musi wystartować rilbridged pierwszy).
+
+service aerophone-radio-bridge /vendor/bin/hw/android.hardware.radio-service.aerophone
+    class hal
+    user radio
+    group radio inet net_raw
+    # vsock wymaga dostępu do urządzenia
+    capabilities NET_ADMIN NET_BIND_SERVICE
+    # Restart przy awarii — ale nie w pętli
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start aerophone-radio-bridge
+
+# Jeśli host zrestartuje rilbridged, gość musi się połączyć ponownie
+on property:vendor.aerophone.rilbridge.reconnect=1
+    restart aerophone-radio-bridge
+    setprop vendor.aerophone.rilbridge.reconnect 0

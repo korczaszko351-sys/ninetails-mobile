@@ -1,0 +1,55 @@
+# Android.bp — HAL radiowy gościa (ARCVM)
+#
+# Budowany w drzewie AOSP (ARCVM guest). Rejestruje usługę
+# android.hardware.radio.aerophone.IRadioBridge/default w servicemanager.
+
+cc_defaults {
+    name: "aerophone_radio_defaults",
+    cpp_std: "c++20",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+    ],
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libbinder_ndk",
+        "libprotobuf-cpp-lite",
+    ],
+    static_libs: [
+        "rilbridge_proto",
+    ],
+    vendor: true,
+}
+
+// Biblioteka AIDL (generowana z .aidl)
+cc_library {
+    name: "android.hardware.radio.aerophone-V1-ndk",
+    srcs: [
+        "aidl/android/hardware/radio/aerophone/*.aidl",
+    ],
+    vendor: true,
+    vintf_stability: "vintf",
+}
+
+// Usługa HAL
+cc_binary {
+    name: "android.hardware.radio-service.aerophone",
+    defaults: ["aerophone_radio_defaults"],
+    srcs: ["RadioBridge.cpp"],
+    shared_libs: [
+        "android.hardware.radio.aerophone-V1-ndk",
+    ],
+    init_rc: ["radio-bridge.rc"],
+    vintf_fragments: ["radio-bridge.xml"],
+    vendor: true,
+}
+
+// Testy
+cc_test {
+    name: "RadioBridge_test",
+    defaults: ["aerophone_radio_defaults"],
+    srcs: ["RadioBridge_test.cpp"],
+    static_libs: ["libgtest"],
+}

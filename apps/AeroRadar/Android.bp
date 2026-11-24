@@ -1,0 +1,57 @@
+# Android.bp — AeroRadar (aplikacja systemowa, priv-app)
+#
+# Budowana w drzewie AOSP (ARCVM guest) jako część obrazu systemowego.
+# Instalowana w /system/priv-app/AeroRadar — ma uprawnienia systemowe.
+
+android_app {
+    name: "AeroRadar",
+    manifest: "AndroidManifest.xml",
+    srcs: [
+        "src/**/*.kt",
+    ],
+    resource_dirs: ["res"],
+    platform_apis: true,          // dostęp do API ukrytych (telefonia, lokalizacja)
+    privileged: true,             // priv-app: uprawnienia z privapp-permissions
+    certificate: "platform",      // podpisany kluczem platformy
+    product_specific: false,
+    system_ext_specific: false,
+    optimize: {
+        enabled: true,
+        proguard_flags_files: ["proguard.flags"],
+    },
+    static_libs: [
+        "androidx.core_core-ktx",
+        "androidx.lifecycle_lifecycle-runtime-ktx",
+        "kotlinx-coroutines-android",
+        "aeroradar-adsb",
+    ],
+    kotlincflags: ["-Xjvm-default=all"],
+    aaptflags: [
+        "--auto-add-overlay",
+    ],
+    required: ["AeroRadarOverlay"],
+}
+
+// Biblioteka ADS-B (parsowanie ramek, dekodowanie)
+java_library {
+    name: "aeroradar-adsb",
+    srcs: ["src/com/aerophone/aeroradar/adsb/**/*.kt"],
+    sdk_version: "system_current",
+    static_libs: ["kotlinx-coroutines-core"],
+}
+
+// Overlay RRO — domyślne ustawienia AeroRadar (region PL, jednostki metryczne)
+runtime_resource_overlay {
+    name: "AeroRadarOverlay",
+    theme: "AeroRadarOverlay",
+    sdk_version: "current",
+    product_specific: true,
+}
+
+// Uprawnienia priv-app
+prebuilt_etc {
+    name: "AeroRadarPrivappPermissions",
+    src: "permissions/privapp-permissions-aeroradar.xml",
+    sub_dir: "permissions",
+    filename_from_src: true,
+}

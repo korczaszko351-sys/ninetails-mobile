@@ -1,0 +1,22 @@
+# proguard.flags — reguły R8/ProGuard dla AeroRadar
+#
+# AeroRadar używa platform APIs (ukrytych), więc nie obfuskujemy klas
+# związanych z frameworkiem. Reszta może być obfuskowana.
+
+# Zachowaj klasy modelu (serializacja, refleksja w JSON)
+-keep class com.aerophone.aeroradar.adsb.** { *; }
+
+# Zachowaj usługi i odbiorniki (nazwy z manifestu)
+-keep class com.aerophone.aeroradar.service.** { *; }
+-keep class com.aerophone.aeroradar.ui.** { *; }
+
+# Zachowaj ContentProvider
+-keep class com.aerophone.aeroradar.data.AircraftProvider { *; }
+
+# Kotlin metadata
+-keepattributes *Annotation*, InnerClasses, Signature, Exceptions
+-dontwarn kotlinx.coroutines.**
+
+# Platform APIs — nie ostrzegaj o braku
+-dontwarn android.telephony.**
+-dontwarn com.android.internal.**
