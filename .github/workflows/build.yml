@@ -60,11 +60,48 @@ jobs:
       - name: Spójność konfiguracji urządzenia
         run: |
           set -euo pipefail
-          test -f device/aerophone/BoardConfig.mk
-          test -f device/aerophone/device.mk
-          test -f device/aerophone/manifest.xml
-          grep -q 'TARGET_BOARD_PLATFORM' device/aerophone/BoardConfig.mk
-          grep -q 'AeroRadar' device/aerophone/device.mk
+          fail=0
+          need() {
+            if [[ -f "$1" ]]; then
+              printf '  %-52s OK\n' "$1"
+            else
+              printf '  %-52s BRAK\n' "$1"; fail=1
+            fi
+          }
+          echo "Pliki konfiguracji urządzenia:"
+          need device/aerophone/BoardConfig.mk
+          need device/aerophone/device.mk
+          need device/aerophone/manifest.xml
+          need device/aerophone/sepolicy/rilbridged.te
+          need device/aerophone/sepolicy/file_contexts
+          need device/aerophone/telephony/modem.conf
+          need device/aerophone/telephony/apns-conf.xml
+          need telephony/proto/rilbridge.proto
+          need telephony/host/rilbridged.cc
+          need telephony/guest/RadioBridge.cpp
+          need apps/AeroRadar/Android.bp
+          need apps/AeroRadar/AndroidManifest.xml
+          need apps/AeroRadar/permissions/privapp-permissions-aeroradar.xml
+          (( fail == 0 )) || { echo "brakuje plików konfiguracji"; exit 1; }
+
+          echo "Spójność wartości:"
+          grep -q 'TARGET_BOARD_PLATFORM' device/aerophone/BoardConfig.mk \
+            && echo "  BoardConfig: TARGET_BOARD_PLATFORM OK"
+          grep -q 'AeroRadar' device/aerophone/device.mk \
+            && echo "  device.mk: AeroRadar w PRODUCT_PACKAGES OK"
+
+          # Port vsock musi być ten sam w konfiguracji płytki, modem.conf i kodzie
+          PORT_BOARD=$(grep -oP 'BOARD_RILBRIDGE_VSOCK_PORT\s*:=\s*\K[0-9]+' device/aerophone/BoardConfig.mk)
+          PORT_CONF=$(grep -oP '^vsock_port\s*=\s*\K[0-9]+' device/aerophone/telephony/modem.conf)
+          PORT_CODE=$(grep -oP 'vsock_port\s*=\s*\K[0-9]+' telephony/host/rilbridged.cc | head -1)
+          echo "  vsock: board=${PORT_BOARD} conf=${PORT_CONF} code=${PORT_CODE}"
+          [[ "${PORT_BOARD}" == "${PORT_CONF}" && "${PORT_BOARD}" == "${PORT_CODE}" ]] \
+            || { echo "niespójny port vsock"; exit 1; }
+
+          # Wersja protokołu w .proto musi być zgodna z tą w kodzie
+          grep -q 'protocol_version(1)' telephony/host/rilbridged.cc \
+            && echo "  protokół: wersja 1 OK"
+
           echo "Konfiguracja płytki aerophone: OK"
 
   # ---------------------------------------------------------------------------
@@ -100,8 +137,10 @@ jobs:
           mkdir -p out/obj
           # tools/ci/android-base/logging.h to shim: w drzewie AOSP/Chromium OS
           # ten nagłówek pochodzi z libbase. Tutaj podstawiamy zgodny interfejs.
+          # libdbus ma nagłówki w niestandardowej ścieżce — bierzemy je z pkg-config.
           CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
-                    -Iout/proto -Itelephony/host -Itools/ci"
+                    -Iout/proto -Itelephony/host -Itools/ci \
+                    $(pkg-config --cflags dbus-1)"
           for src in telephony/host/rilbridged.cc \
                      telephony/host/qmi_backend.cc \
                      telephony/host/mbim_backend.cc \
@@ -113,23 +152,33 @@ jobs:
           echo "---"
           ls -l out/obj
 
+      # UWAGA: to DWIE osobne binarki, każda ma własny main().
+      # Linkowanie wszystkich .o razem daje "multiple definition of main".
       - name: Linkowanie
         run: |
           set -euo pipefail
-          g++ -o out/rilbridged out/obj/rilbridged.o \
-              out/obj/qmi_backend.o out/obj/mbim_backend.o \
+          # 1) demon mostu RIL (rilbridged.cc + backendy)
+          g++ -o out/rilbridged \
+              out/obj/rilbridged.o \
+              out/obj/qmi_backend.o \
+              out/obj/mbim_backend.o \
               out/proto/rilbridge.pb.cc \
               -lprotobuf -lpthread
-          g++ -o out/aerophone-telephony-dbus out/obj/dbus_service.o -ldbus-1
+          # 2) usługa D-Bus telefonii hosta (osobny main)
+          g++ -o out/aerophone-telephony-dbus \
+              out/obj/dbus_service.o \
+              $(pkg-config --libs dbus-1) -lpthread
+          echo "---"
           file out/rilbridged out/aerophone-telephony-dbus
           ls -lh out/rilbridged out/aerophone-telephony-dbus
 
-      - name: Test dymny binarki
+      - name: Test dymny binarek
         run: |
           set -euo pipefail
           ./out/rilbridged --help
           echo "---"
-          echo "Binarka istnieje i startuje (brak modemu/vsock w runnerze = oczekiwane)."
+          echo "rilbridged: startuje i wypisuje pomoc."
+          echo "Brak modemu/vsock w runnerze = oczekiwane (nie uruchamiamy mostu)."
 
       - name: Artefakt — binarki mostu RIL
         uses: actions/upload-artifact@v4
@@ -163,12 +212,36 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Runner ubuntu-24.04 ma Android SDK w /usr/local/lib/android/sdk.
+      # NIE używamy android-actions/setup-android@v3: próbuje on doinstalować
+      # pakiet "tools", którego nie ma już w repozytoriach SDK, i kończy job
+      # błędem. Instalujemy tylko to, czego naprawdę potrzebujemy.
       - name: Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=${SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+          test -d "${SDK_ROOT}" || { echo "brak katalogu SDK: ${SDK_ROOT}"; exit 1; }
+          echo "${SDK_ROOT}/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "${SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
+          ls "${SDK_ROOT}"
 
       - name: Instalacja platformy i build-tools
         run: |
-          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" | tail -5
+          set -euo pipefail
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [[ -z "${SDKMANAGER}" ]]; then
+            SDKMANAGER="$(find "${ANDROID_SDK_ROOT}/cmdline-tools" -name sdkmanager -type f | head -1)"
+          fi
+          test -n "${SDKMANAGER}" || { echo "nie znalazłem sdkmanager"; exit 1; }
+          echo "sdkmanager: ${SDKMANAGER}"
+          yes | "${SDKMANAGER}" --licenses > /dev/null 2>&1 || true
+          "${SDKMANAGER}" --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "---"
+          ls "${ANDROID_SDK_ROOT}/platforms"
+          ls "${ANDROID_SDK_ROOT}/build-tools"
 
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -187,7 +260,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aeroradar-debug-apk
-          path: apps/AeroRadar/build/outputs/apk/debug/*.apk
+          path: |
+            apps/AeroRadar/build/outputs/apk/debug/*.apk
+            apps/AeroRadar/build/outputs/apk/**/*.apk
           if-no-files-found: warn
 
       - name: Artefakt — log Gradle
