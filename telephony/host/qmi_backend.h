@@ -1,18 +1,16 @@
-// qmi_backend.h — interfejs backendu QMI (Qualcomm MSM Interface).
+// qmi_backend.h — deklaracja backendu QMI.
 //
-// Backend QMI realizuje żądania protokołu rilbridge na urządzeniu modemowym
-// (/dev/qmi0) przy użyciu QMI. W drzewie AOSP/Chromium OS korzysta z libqmi
-// albo własnego klienta QMI (QMI to binarny protokół Qualcomma).
-//
-// Ten plik definiuje kontrakt: co backend musi umieć. Implementacja
-// (qmi_backend.cc) mapuje każde żądanie na odpowiednią wiadomość QMI.
+// Wydzielone z rilbridged.cc, żeby backendy (QMI, MBIM) były wymienne
+// i testowalne bez modemu (mock w testach).
 
-#ifndef AEROPHONE_TELEPHONY_HOST_QMI_BACKEND_H_
-#define AEROPHONE_TELEPHONY_HOST_QMI_BACKEND_H_
+#ifndef AEROPHONE_TELEPHONY_QMI_BACKEND_H_
+#define AEROPHONE_TELEPHONY_QMI_BACKEND_H_
 
 #include <cstdint>
+#include <functional>   // std::function (EventCallback)
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "rilbridge.pb.h"
 
@@ -25,42 +23,96 @@ namespace telephony {
 // i ich implementacje nie musiały kwalifikować każdego typu osobno.
 using namespace ::aerophone::rilbridge;
 
-// Interfejs backendu modemu.
-//
-// Cykl życia:
-//   Open()  — otwiera urządzenie, negocjuje wersję QMI
-//   Handle() — obsługuje jedno żądanie z protokołu rilbridge
-//   Close() — zamyka urządzenie
+// Interfejs backendu — wspólny dla QMI i MBIM.
 class ModemBackend {
  public:
   virtual ~ModemBackend() = default;
 
-  // Otwiera urządzenie modemowe. Zwraca false, jeśli się nie udało.
   virtual bool Open(const std::string& device) = 0;
-
-  // Zamyka urządzenie. Bezpieczne do wielokrotnego wywołania.
   virtual void Close() = 0;
 
-  // Czy backend jest gotowy do pracy.
-  virtual bool IsOpen() const = 0;
+  virtual Error::Code Dial(const DialRequest& req, int32_t* call_id) = 0;
+  virtual Error::Code Answer(const AnswerRequest& req) = 0;
+  virtual Error::Code Hangup(const HangupRequest& req) = 0;
+  virtual Error::Code SendSms(const SendSmsRequest& req, int32_t* msg_ref) = 0;
+  virtual Error::Code SendUssd(const SendUssdRequest& req, std::string* resp) = 0;
+  virtual Error::Code SetRadioState(const SetRadioStateRequest& req) = 0;
+  virtual Error::Code DataCall(const DataCallRequest& req) = 0;
+  virtual Error::Code SimOp(const SimRequest& req, std::string* out) = 0;
+  virtual Error::Code QuerySignal(const SignalQuery& req, SignalUpdateEvent* out) = 0;
+  virtual Error::Code ScanNetworks(const NetworkScanRequest& req,
+                                   std::vector<std::string>* out) = 0;
 
-  // Nazwa backendu ("qmi", "mbim") — do logów i diagnostyki.
-  virtual const char* Name() const = 0;
+  using EventCallback = std::function<void(const Envelope&)>;
+  virtual void SetEventCallback(EventCallback cb) = 0;
 
-  // Obsługuje jedno żądanie. Wypełnia `reply` (response albo error).
-  // Zwraca false tylko przy błędzie transportu (wtedy połączenie pada).
-  virtual bool Handle(const Envelope& request, Envelope* reply) = 0;
-
-  // Wywoływane, gdy modem zgłasza zdarzenie asynchroniczne (połączenie
-  // przychodzące, SMS, zmiana stanu SIM). Implementacja wysyła je do klienta.
-  virtual void SetEventSink(std::function<void(const Envelope&)> sink) = 0;
+  virtual std::string StateString() const = 0;
 };
 
-// Fabryki backendów.
-std::unique_ptr<ModemBackend> CreateQmiBackend();
-std::unique_ptr<ModemBackend> CreateMbimBackend();
+// Backend QMI (Qualcomm).
+class QmiBackend : public ModemBackend {
+ public:
+  QmiBackend();
+  ~QmiBackend() override;
+
+  bool Open(const std::string& device) override;
+  void Close() override;
+
+  Error::Code Dial(const DialRequest& req, int32_t* call_id) override;
+  Error::Code Answer(const AnswerRequest& req) override;
+  Error::Code Hangup(const HangupRequest& req) override;
+  Error::Code SendSms(const SendSmsRequest& req, int32_t* msg_ref) override;
+  Error::Code SendUssd(const SendUssdRequest& req, std::string* resp) override;
+  Error::Code SetRadioState(const SetRadioStateRequest& req) override;
+  Error::Code DataCall(const DataCallRequest& req) override;
+  Error::Code SimOp(const SimRequest& req, std::string* out) override;
+  Error::Code QuerySignal(const SignalQuery& req, SignalUpdateEvent* out) override;
+  Error::Code ScanNetworks(const NetworkScanRequest& req,
+                           std::vector<std::string>* out) override;
+
+  void SetEventCallback(EventCallback cb) override;
+  std::string StateString() const override;
+
+ private:
+  std::string device_;
+  std::string state_ = "qmi:init";
+  EventCallback event_cb_;
+};
+
+// Backend MBIM (uniwersalny, dla modemów nie-Qualcomm).
+class MbimBackend : public ModemBackend {
+ public:
+  MbimBackend();
+  ~MbimBackend() override;
+
+  bool Open(const std::string& device) override;
+  void Close() override;
+
+  Error::Code Dial(const DialRequest& req, int32_t* call_id) override;
+  Error::Code Answer(const AnswerRequest& req) override;
+  Error::Code Hangup(const HangupRequest& req) override;
+  Error::Code SendSms(const SendSmsRequest& req, int32_t* msg_ref) override;
+  Error::Code SendUssd(const SendUssdRequest& req, std::string* resp) override;
+  Error::Code SetRadioState(const SetRadioStateRequest& req) override;
+  Error::Code DataCall(const DataCallRequest& req) override;
+  Error::Code SimOp(const SimRequest& req, std::string* out) override;
+  Error::Code QuerySignal(const SignalQuery& req, SignalUpdateEvent* out) override;
+  Error::Code ScanNetworks(const NetworkScanRequest& req,
+                           std::vector<std::string>* out) override;
+
+  void SetEventCallback(EventCallback cb) override;
+  std::string StateString() const override;
+
+ private:
+  std::string device_;
+  std::string state_ = "mbim:init";
+  EventCallback event_cb_;
+};
+
+// Fabryka: wybiera backend po nazwie ("qmi" | "mbim").
+std::unique_ptr<ModemBackend> CreateBackend(const std::string& name);
 
 }  // namespace telephony
 }  // namespace aerophone
 
-#endif  // AEROPHONE_TELEPHONY_HOST_QMI_BACKEND_H_
+#endif  // AEROPHONE_TELEPHONY_QMI_BACKEND_H_

@@ -69,8 +69,10 @@ class RadarActivity : ComponentActivity() {
         }
     }
 
+    // UWAGA: sygnatura musi być dokładnie taka jak w Activity:
+    //   Array<String> (nie Array<out String>) — inaczej "overrides nothing".
     override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray,
+        requestCode: Int, permissions: Array<String>, grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_PERMS) {
