@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- styles.xml — motyw AeroRadar (ciemny, radarowy) -->
+<resources>
+
+    <style name="Theme.AeroRadar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#1A73E8</item>
+        <item name="android:colorAccent">#0F9D58</item>
+        <item name="android:windowBackground">#0B1420</item>
+        <item name="android:statusBarColor">#0B1420</item>
+        <item name="android:navigationBarColor">#0B1420</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.AeroRadar.Transparent" parent="Theme.AeroRadar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <!-- Wiersz szczegółów: etykieta po lewej, wartość po prawej -->
+    <style name="DetailRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingVertical">10dp</item>
+    </style>
+
+    <style name="DetailLabel">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">#8FA3BC</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="DetailValue">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1.4</item>
+        <item name="android:gravity">end</item>
+        <item name="android:textColor">#E8F0FE</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+
+</resources>

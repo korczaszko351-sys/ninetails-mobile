@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  strings.xml — teksty AeroRadar (polski jako domyślny).
+  Wartości w res/values-en/ dla angielskiego.
+-->
+<resources>
+    <string name="app_name">AeroRadar</string>
+
+    <!-- Ekran główny -->
+    <string name="status_scanning">Skanuję niebo…</string>
+    <string name="status_empty">Brak samolotów w zasięgu</string>
+    <string name="status_count">%1$d samolotów w zasięgu</string>
+    <string name="err_no_location">Brak uprawnień do lokalizacji — radar nie może działać</string>
+    <string name="err_no_fix">Brak pozycji GPS — wyjdź na zewnątrz i spróbuj ponownie</string>
+
+    <!-- Ustawienia -->
+    <string name="settings_title">Ustawienia</string>
+    <string name="settings_radius">Promień skanowania</string>
+    <string name="settings_units">Jednostki</string>
+    <string name="settings_units_metric">Metryczne (km, m)</string>
+    <string name="settings_units_imperial">Imperialne (mi, ft)</string>
+    <string name="settings_endpoint">Adres API ADS-B</string>
+    <string name="settings_alerts">Alerty o samolotach nad głową</string>
+    <string name="settings_radar_enabled">Uruchamiaj radar po restarcie telefonu</string>
+
+    <!-- Powiadomienia -->
+    <string name="channel_ongoing">Radar aktywny</string>
+    <string name="channel_ongoing_desc">Stałe powiadomienie podczas śledzenia samolotów</string>
+    <string name="channel_alerts">Alerty o samolotach</string>
+    <string name="channel_alerts_desc">Powiadomienia, gdy samolot przelatuje nad Tobą</string>
+    <string name="notif_radar_title">AeroRadar</string>
+    <string name="notif_overhead_title">Samolot nad głową</string>
+
+    <!-- Szczegóły samolotu (Aero ID) -->
+    <string name="detail_title">Aero ID</string>
+    <string name="detail_callsign">Callsign</string>
+    <string name="detail_registration">Rejestracja</string>
+    <string name="detail_type">Typ</string>
+    <string name="detail_airline">Linia</string>
+    <string name="detail_route">Trasa</string>
+    <string name="detail_altitude">Wysokość</string>
+    <string name="detail_speed">Prędkość</string>
+    <string name="detail_distance">Odległość</string>
+    <string name="detail_heading">Kurs</string>
+    <string name="detail_squawk">Squawk</string>
+    <string name="detail_icao">ICAO 24-bit</string>
+
+    <!-- Stopka / disclaimer -->
+    <string name="disclaimer">Dane ADS-B — nie jest to narzędzie nawigacyjne ani system bezpieczeństwa lotniczego.</string>
+</resources>

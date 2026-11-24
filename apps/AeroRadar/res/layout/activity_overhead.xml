@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_overhead.xml — przezroczysty podgląd "co nade mną?" -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#E60B1420"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/overhead_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/status_scanning"
+        android:textColor="#E8F0FE"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:fontFamily="monospace" />
+
+    <TextView
+        android:id="@+id/overhead_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="#8FA3BC"
+        android:textSize="15sp" />
+
+</LinearLayout>
